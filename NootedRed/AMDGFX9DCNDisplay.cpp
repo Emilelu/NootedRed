@@ -254,7 +254,8 @@ ATIFormat AMDRadeonX5000_AMDGFX9DCNDisplay::getPixelFormat(AMDRadeonX5000_AMDHWD
     DBGLOG("GFX9DCNDisplay", "%s << (pixelMode: %s)", __func__, stringifyATIPixelMode(pixelMode));
     ATIFormat ret;
     switch (pixelMode) {
-        case ATIPixelMode::C_8          : ret = ATIFormat::BGRA8; break;
+        case ATIPixelMode::C_8          :
+        case ATIPixelMode::C_8_8_8_8    : ret = ATIFormat::BGRA8; break;
         case ATIPixelMode::C_2_10_10_10 : ret = ATIFormat::ARGB2101010; break;
         case ATIPixelMode::C_16_16_16_16: ret = ATIFormat::BGRA16; break;
         case ATIPixelMode::C_5_6_5      :
