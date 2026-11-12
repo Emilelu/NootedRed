@@ -1,0 +1,21 @@
+﻿name: Fetch AppleForge
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["ci/fetch-appleforge"]
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clone AppleForge
+        run: |
+          git clone --recurse-submodules https://git.chefkiss.dev/AppleHax/AppleForge.git AppleForge
+          du -sh AppleForge
+      - name: Archive
+        run: tar --exclude=.git -czf AppleForge.tar.gz AppleForge
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AppleForge
+          path: AppleForge.tar.gz
