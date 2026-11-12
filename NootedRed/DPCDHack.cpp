@@ -1,4 +1,4 @@
-﻿// AMD Display DPCD overrides
+// AMD Display DPCD overrides
 //
 // Apple's DC picks the link rate from the receiver-capability block (DPCD 0x000..0x00F).
 // Its legacy MAX_LINK_RATE byte at 0x001 is what falls back to HBR2, even when the panel
@@ -47,8 +47,7 @@ bool  enabled      = false;
 void* embeddedLink = nullptr;
 
 // DC status is 0 on success, and so is kIOReturnSuccess, so a plain zero check covers both.
-using ReadDpcdFn      = UInt32 (*)(void* link, UInt32 address, UInt8* data, UInt32 size);
-ReadDpcdFn orgReadDpcd = nullptr;
+mach_vm_address_t orgReadDpcd = 0;
 
 [[maybe_unused]] bool tableHasHBR3(const UInt8* data, const UInt32 size)
 {
