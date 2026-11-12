@@ -254,7 +254,11 @@ ATIFormat AMDRadeonX5000_AMDGFX9DCNDisplay::getPixelFormat(AMDRadeonX5000_AMDHWD
     DBGLOG("GFX9DCNDisplay", "%s << (pixelMode: %s)", __func__, stringifyATIPixelMode(pixelMode));
     ATIFormat ret;
     switch (pixelMode) {
-        case ATIPixelMode::C_8          : ret = ATIFormat::BGRA8; break;
+        // DEPTH_32 + FORMAT_8 is reported as C_8_8_8_8 by getPixelMode. Leaving it on the default
+        // branch made the 8bpc pipeline advertise Luminance8, which is not a displayable surface
+        // format for DCN2 and ended in a zero-sized framebuffer / dead display pipe.
+        case ATIPixelMode::C_8          :
+        case ATIPixelMode::C_8_8_8_8    : ret = ATIFormat::BGRA8; break;
         case ATIPixelMode::C_2_10_10_10 : ret = ATIFormat::ARGB2101010; break;
         case ATIPixelMode::C_16_16_16_16: ret = ATIFormat::BGRA16; break;
         case ATIPixelMode::C_5_6_5      :

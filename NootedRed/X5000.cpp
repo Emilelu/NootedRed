@@ -889,6 +889,48 @@ namespace
 
 }    // namespace
 
+namespace
+{
+    // The DCN2 display block of Renoir only accepts the swizzle modes advertised by
+    // `Dcn2NonBpp64SwModeMask` (0x2020201: linear, 4KB_S_X, 32KB_S_X and 64KB_S_X). AddrLib's
+    // preferred-setting helper decides from format/geometry alone and can return a mode outside that
+    // mask for some framebuffer formats, in which case `getSurfaceInfo2` fails with
+    // kIOReturnBadArgument, the framebuffer size stays 0 and WindowServer aborts the display pipe
+    // ("Fallback GPU Display Pipe transaction submission failed") when it switches to that depth.
+    // Retry the computation with the modes the display block accepts before giving up.
+    constexpr UInt32 kDisplaySurfaceFallbackSwizzles[] = {
+        0x19U,    // 64KB_S_X
+        0x9U,     // 4KB_S_X
+        0x0U,     // linear
+    };
+
+    bool computeDisplaySurfaceInfo(AMDRadeonX5000_AMDHWAlignManager* const alignManager,
+                                   ADDR2_COMPUTE_SURFACE_INFO_INPUT* const input,
+                                   ADDR2_COMPUTE_SURFACE_INFO_OUTPUT* const output)
+    {
+        if (alignManager == nullptr || input == nullptr || output == nullptr) { return false; }
+
+        auto ret = alignManager->getSurfaceInfo2(input, output);
+        if (ret == kIOReturnSuccess && output->pitch != 0 && output->height != 0) { return true; }
+
+        for (const auto swizzleMode : kDisplaySurfaceFallbackSwizzles) {
+            if (swizzleMode == input->swizzleMode) { continue; }
+
+            input->swizzleMode = swizzleMode;
+            ret                = alignManager->getSurfaceInfo2(input, output);
+            if (ret == kIOReturnSuccess && output->pitch != 0 && output->height != 0) {
+                DBGLOG("X5000", "Display surface accepted fallback swizzle %#x (pitch %u height %u baseAlign %u)",
+                       swizzleMode, output->pitch, output->height, output->baseAlign);
+                return true;
+            }
+        }
+
+        DBGLOG("X5000", "Display surface info failed for every supported swizzle mode (ret %d)",
+               static_cast<int>(ret));
+        return false;
+    }
+}    // namespace
+
 bool X5000::fixedGetDisplayInfo(AMDRadeonX5000_AMDHWDisplay* const self, const UInt32 fbIndex, const bool isCRTEnabled,
                                 const bool ignoreCRTOffsetCheck, IOFramebuffer* const fb, FramebufferInfo* const fbInfo)
 {
@@ -1104,15 +1146,16 @@ bool X5000::fixedGetDisplayInfo(AMDRadeonX5000_AMDHWDisplay* const self, const U
         surfInfoInput.numSamples = 1;
         surfInfoInput.numSlices  = 1;
         surfInfoInput.flags.display = true;
-        surfInfoInput.swizzleMode =
-            self->getHWInterface()->getHWAlignManager()->getPreferredSwizzleMode2(&surfInfoInput);
+        auto* const hwAlignManager  = self->getHWInterface()->getHWAlignManager();
+        surfInfoInput.swizzleMode   = hwAlignManager->getPreferredSwizzleMode2(&surfInfoInput);
+        // computeDisplaySurfaceInfo() may fall back to another display-block supported swizzle mode, so the
+        // mode that was actually used is published to the layout/HUBP paths only after the computation.
+        const bool hasSurfaceInfo =
+            computeDisplaySurfaceInfo(hwAlignManager, &surfInfoInput, &self->surfInfoOutputs()[fbIndex]);
         self->savedSwizzleModes()[fbIndex]  = surfInfoInput.swizzleMode;
         self->swizzleModes()[fbIndex]       = surfInfoInput.swizzleMode;
         self->savedResourceTypes()[fbIndex] = surfInfoInput.resourceType;
-        if (self->getHWInterface()->getHWAlignManager()->getSurfaceInfo2(&surfInfoInput,
-                                                                         &self->surfInfoOutputs()[fbIndex])
-            == kIOReturnSuccess)
-        {
+        if (hasSurfaceInfo) {
             fbInfo->size = fbInfo->pitch * self->surfInfoOutputs()[fbIndex].height * hwSpecificInfo.bytesPerPixel;
         }
         else {
@@ -1178,7 +1221,7 @@ void X5000::fixedGetSurfaceInfo(AMDRadeonX5000_AMDHWAlignManager* const self, AM
     input.swizzleMode   = self->getPreferredSwizzleMode2(&input);    // this was hardcoded to 0xa
 
     ADDR2_COMPUTE_SURFACE_INFO_OUTPUT output;
-    if (self->getSurfaceInfo2(&input, &output) == kIOReturnSuccess) {
+    if (computeDisplaySurfaceInfo(self, &input, &output)) {
         pStruct->outWidth      = static_cast<UInt16>(output.pitch);
         pStruct->outHeight     = static_cast<UInt16>(output.height);
         pStruct->outTilingMode = input.swizzleMode;    // I think AMD forgot this, albeit seemingly unused
