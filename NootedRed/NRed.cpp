@@ -23,6 +23,7 @@
 #include <AGDP.hpp>
 #include <AppleGFXHDA.hpp>
 #include <Backlight.hpp>
+#include <DPCDHack.hpp>
 #include <DebugEnabler.hpp>
 #include <DeviceProfile.hpp>
 #include <DriverInjector.hpp>
@@ -70,6 +71,8 @@ void NRed::init()
 
     Backlight::singleton().init();
 
+    DPCDHack::init();
+
     this->forceVDA = checkKernelArgument("-NRedForceVDA");
 
     UserPatches::singleton().init();
@@ -99,6 +102,7 @@ void NRed::init()
         {
             AGDP::singleton().processKext(patcher, id, slide, size);
             Backlight::singleton().processKext(patcher, id, slide, size);
+            DPCDHack::processKext(patcher, id, slide, size);
             DebugEnabler::singleton().processKext(patcher, id, slide, size);
             X6000FB::singleton().processKext(patcher, id, slide, size);
             AppleGFXHDA::singleton().processKext(patcher, id, slide, size);

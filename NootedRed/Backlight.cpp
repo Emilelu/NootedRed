@@ -22,6 +22,7 @@
 // along with this work.  If not, see https://git.chefkiss.dev/ChefKiss/OpenKnowledge/raw/branch/master/LICENSE-v1.md.
 
 #include <Backlight.hpp>
+#include <DPCDHack.hpp>
 #include <GPUDriversAMD/DC/SignalTypes.hpp>
 #include <Headers/kern_api.hpp>
 #include <Headers/kern_devinfo.hpp>
@@ -256,6 +257,7 @@ void* Backlight::wrapLinkCreate(void* data)
         case SIGNAL_TYPE_EDP: {
             if (singleton().embeddedPanelLink == nullptr) {
                 singleton().embeddedPanelLink = ret;
+                DPCDHack::noteEdpLink(ret);
                 const auto& linkCaps          = singleton().dcLinkCapsField(ret);
                 // TODO: PWM should be used for SDR mode on LCD HDR panels,
                 // but AUX for HDR mode. Linux doesn't support HDR properly,
